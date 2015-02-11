@@ -14,6 +14,7 @@ There is order to be enforced for starting instances of these different agents.
 
 ## Common pre-requisites
 
+- JDK 1.7+
 - SBT 0.13.x
 
 [Travis](https://travis-ci.org/cchantep/rincewind): ![Travis build status](https://travis-ci.org/cchantep/rincewind.svg?branch=master)

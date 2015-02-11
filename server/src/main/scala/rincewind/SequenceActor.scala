@@ -35,7 +35,7 @@ class SequenceActor(writer: ActorRef, req: ReaderRequest)
     }
     case Terminated(_) => {
       println(s"Failure before sequence generation: $writer, $req")
-      context.actorSelection("server") ! CommunicationError(writer, req)
+      context.actorSelection("../server") ! CommunicationError(writer, req)
     }
     case msg => println(s"Unsupported message: $msg")
   }
