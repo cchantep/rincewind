@@ -23,10 +23,14 @@ There is order to be enforced for starting instances of these different agents.
 
 To start a server using SBT from the CLI in this project base directory: `/path/to/sbt ';project server ;run'`
 
+## Writer
+
+To start a writer using SBT from the CLI in this project base directory: `/path/to/sbt ';project writer ;run'`
+
 ## Reader
 
 To start a reader using SBT from the CLI in this project base directory: `/path/to/sbt ';project reader ;run'`
 
-## Writer
+**As soon as the reader is provided a sequence** (`Completed sequence ...` in CLI), an embedded Web server is started. In this way, the reader will expose gathered data to HTTP request.
 
-To start a writer using SBT from the CLI in this project base directory: `/path/to/sbt ';project writer ;run'`
+To test the Web interface of the reader, you can open [localhost:3000/random](http://localhost:3000/random) in your browser.

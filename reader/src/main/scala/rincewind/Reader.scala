@@ -93,15 +93,26 @@ final class ReaderActor(serverHost: String, serverPort: Int)
     case msg => println(s"Unsupported message = $msg")
   }
 
+  /** All sequences are available.  */
+  private def completed(st: ActiveState): Receive = {
+    // TODO: Stop the web
+      
+    case msg => println(s"Unsupported message = $msg")
+  }
+
   /** Server is located, and new reader should get the sequences from there. */
   private def active(st: ActiveState): Receive = {
-    case FetchSequences(0) =>
+    case FetchSequences(0) => {
       println("All sequences are now found")
+      context.setReceiveTimeout(Duration.Undefined)
+      context unwatch sender() // Stop watching the server
+      context become completed(st)
+    }
 
     case FetchSequences(rem) =>
       val uuid = UUID.randomUUID.toString
       context become askingSequence(st)(rem, uuid, Nil)
-      st.server ! (uuid -> 0)      
+      st.server ! (uuid -> 0) 
 
     case ReceiveTimeout =>
       println("Too much time waiting for sequences")
@@ -128,6 +139,7 @@ final class ReaderActor(serverHost: String, serverPort: Int)
       context watch serverActor
       context become active(ActiveState(
         serverActor, Map.empty[String, List[Int]]))
+      WebServer(self).run()
 
       self ! FetchSequences(1000) // TODO: Get from config
     }
