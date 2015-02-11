@@ -31,8 +31,11 @@ object Writer {
 final class WriterActor(serverHost: String, serverPort: Int)
     extends akka.actor.Actor {
 
+  import scala.util.Random
   import scala.concurrent.duration._
-  import akka.actor.{ ActorIdentity, Identify, ReceiveTimeout, Terminated }
+  import akka.actor.{
+    ActorIdentity, ActorRef, Identify, ReceiveTimeout, Terminated
+  }
 
   /** Path to the remote server actor */
   val path = s"akka.tcp://Rincewind@$serverHost:$serverPort/user/server"
@@ -49,8 +52,9 @@ final class WriterActor(serverHost: String, serverPort: Int)
   }
 
   /** Writer has greeted the server, now it's active. */
-  private val active: Receive = {
-    case (offset: Int, length: Int) =>
+  private def active(data: List[Int]): Receive = {
+    case (offset: Int, length: Int) => 
+      sendData(sender())(offset, data.drop(offset).take(length))
       
     case Terminated(_) => {
       context become serverTerminated
@@ -70,7 +74,7 @@ final class WriterActor(serverHost: String, serverPort: Int)
       println(s"Located server at $serverActor")
 
       context watch serverActor
-      context become active
+      context become active(captureData)
       serverActor ! 0
     }
 
@@ -94,6 +98,18 @@ final class WriterActor(serverHost: String, serverPort: Int)
     case msg => println(s"Unsupported message = $msg")
   }
 
-  val receive = starting  
-}
+  val receive = starting
 
+  /** Fixture data */
+  private def captureData: List[Int] = (1 to 10).toList
+
+  /** Sends some data to the server. */
+  @annotation.tailrec
+  private def sendData(server: ActorRef)(offset: Int, data: List[Int]): Unit = data match {
+    case next :: then => {
+      server ! (offset, next)
+      sendData(server)(offset+1, then)
+    }
+    case _ => ()
+  }
+}

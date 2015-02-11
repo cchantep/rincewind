@@ -9,7 +9,9 @@ case object StartReader
 
 case class ActiveState(
   server: ActorRef, /** Located server */
-  sequences: List[List[Int]] /** Int sequences maintained on the reader. */
+
+  /** Int sequences maintained on the reader, indexed by UUID. */
+  sequences: Map[String, List[Int]] 
 ) // TODO: Use an in-memory storage for `sequences`
 
 case class FetchSequences(count: Int)
@@ -61,23 +63,45 @@ final class ReaderActor(serverHost: String, serverPort: Int)
    * There are some sequences to be fetched from the server. 
    * Will ask for the next one.
    */
-  private def askingSequence(st: ActiveState)(pending: List[Int]): Receive = {
+  private def askingSequence(st: ActiveState)(remaining: Int, uuid: String, pending: List[Int]): Receive = {
+    case (`uuid`, -1) => {
+      println(s"Completed sequence #${st.sequences.size}: ${pending.reverse}")
+      context become active(st.copy(
+        sequences = st.sequences + (uuid -> pending.reverse)))
+      self ! FetchSequences(remaining - 1)
+    }
+    case (`uuid`, data: Int) => {
+      val Exp = data - 1
+      pending.headOption match {
+        case None | Some(Exp) =>
+          println(s"Data from server for $uuid: $data")
+          context become askingSequence(st)(remaining, uuid, data :: pending)
+
+        case _ => // TODO: Retry
+          println(s"Unexpected data: $data != ${pending.headOption} + 1")
+      }
+    }
+
     case ReceiveTimeout =>
       println("Too much time waiting for the pending sequence")
-      // TODO: Retry      
+      // TODO: Retry
 
     case Terminated(_) => {
       context become serverTerminated
       self ! Retry
-    }      
-    case msg => println(s"Unsupported message = $msg")    
+    }
+    case msg => println(s"Unsupported message = $msg")
   }
 
   /** Server is located, and new reader should get the sequences from there. */
   private def active(st: ActiveState): Receive = {
+    case FetchSequences(0) =>
+      println("All sequences are now found")
+
     case FetchSequences(rem) =>
-      context become askingSequence(st)(Nil)
-      st.server ! (UUID.randomUUID.toString -> 0)      
+      val uuid = UUID.randomUUID.toString
+      context become askingSequence(st)(rem, uuid, Nil)
+      st.server ! (uuid -> 0)      
 
     case ReceiveTimeout =>
       println("Too much time waiting for sequences")
@@ -102,7 +126,8 @@ final class ReaderActor(serverHost: String, serverPort: Int)
       println(s"Located server at $serverActor")
 
       context watch serverActor
-      context become active(ActiveState(serverActor, Nil))
+      context become active(ActiveState(
+        serverActor, Map.empty[String, List[Int]]))
 
       self ! FetchSequences(1000) // TODO: Get from config
     }
