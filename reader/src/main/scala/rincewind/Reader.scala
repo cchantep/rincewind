@@ -16,6 +16,8 @@ case class ActiveState(
 
 case class FetchSequences(count: Int)
 
+case class PickRandomSeq(promise: scala.concurrent.Promise[(String, List[Int])])
+
 case object Retry
 
 object Reader {
@@ -42,6 +44,7 @@ final class ReaderActor(serverHost: String, serverPort: Int)
     extends akka.actor.Actor {
 
   import java.util.UUID
+  import scala.util.Random
   import scala.concurrent.duration._
   import akka.actor.{ ActorIdentity, Identify, ReceiveTimeout, Terminated }
 
@@ -56,7 +59,7 @@ final class ReaderActor(serverHost: String, serverPort: Int)
       // TODO: Try to reconnect, for now just stop reader properly
       context.system.shutdown()
     }
-    case msg => println(s"Unsupported message = $msg")
+    case msg => println(s"Unsupported message (1) = $msg")
   }
 
   /**
@@ -65,7 +68,7 @@ final class ReaderActor(serverHost: String, serverPort: Int)
    */
   private def askingSequence(st: ActiveState)(remaining: Int, uuid: String, pending: List[Int]): Receive = {
     case (`uuid`, -1) => {
-      println(s"Completed sequence #${st.sequences.size}: ${pending.reverse}")
+      println(s"Completed sequence #${st.sequences.size+1}: ${pending.reverse}")
       context become active(st.copy(
         sequences = st.sequences + (uuid -> pending.reverse)))
       self ! FetchSequences(remaining - 1)
@@ -90,14 +93,19 @@ final class ReaderActor(serverHost: String, serverPort: Int)
       context become serverTerminated
       self ! Retry
     }
-    case msg => println(s"Unsupported message = $msg")
+    case msg => println(s"Unsupported message (2) = $msg")
   }
 
   /** All sequences are available.  */
   private def completed(st: ActiveState): Receive = {
     // TODO: Stop the web
+    case PickRandomSeq(promise) => 
+      println("Will pick a random sequence")
+      Random.shuffle(st.sequences).headOption.
+        fold(promise.failure(new IllegalStateException(
+          s"Weird: No available sequence: $st")))(promise.success(_))    
       
-    case msg => println(s"Unsupported message = $msg")
+    case msg => println(s"Unsupported message (2) = $msg")
   }
 
   /** Server is located, and new reader should get the sequences from there. */
@@ -112,7 +120,13 @@ final class ReaderActor(serverHost: String, serverPort: Int)
     case FetchSequences(rem) =>
       val uuid = UUID.randomUUID.toString
       context become askingSequence(st)(rem, uuid, Nil)
-      st.server ! (uuid -> 0) 
+      st.server ! (uuid -> 0)
+
+    case PickRandomSeq(promise) => 
+      println("Will pick a random sequence")
+      Random.shuffle(st.sequences).headOption.
+        fold(promise.failure(new IllegalStateException(
+          s"Weird: No available sequence: $st")))(promise.success(_))
 
     case ReceiveTimeout =>
       println("Too much time waiting for sequences")

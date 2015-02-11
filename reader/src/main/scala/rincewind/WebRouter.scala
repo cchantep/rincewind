@@ -25,7 +25,7 @@ final class WebRouter(reader: ActorRef)
   override def service(req: ServletRequest, resp: ServletResponse) {
     val hreq = req.asInstanceOf[HttpServletRequest]
     val hresp = resp.asInstanceOf[HttpServletResponse]
-    val ctx = WebContext(hreq, hresp)
+    val ctx = WebContext(reader, hreq, hresp)
 
     try {
       hreq match {
@@ -44,15 +44,26 @@ final class WebRouter(reader: ActorRef)
 }
 
 object WebController {
-  import scala.concurrent.Future
+  import scala.concurrent.Promise
   import scala.concurrent.ExecutionContext.Implicits.global
 
+  import argonaut._, Argonaut._
+  import argonaut.Argonaut.{ jString, jObjectAssocList }
+
   /** Requirements for first kind of context */
-  type Ctx1 = WebContext with Responder with AsyncResponder
+  type Ctx1 = WebContext with Responder with AsyncResponder with ActorAware
 
   def random(ctx: Ctx1): Unit = ctx.runFuture {
     ctx.setContentType("application/json")
 
-    Future(ctx.writer.acquireAndGet(_.println("true")))
+    val promise = Promise[(String, List[Int])]()
+
+    ctx.reader ! PickRandomSeq(promise)
+
+    promise.future map {
+      case (uuid, data) =>
+        ctx.writer.acquireAndGet(_.println(jObjectAssocList(List(
+          "uuid" -> jString(uuid), "sequence" -> data.asJson)).nospaces))
+    }
   }
 }

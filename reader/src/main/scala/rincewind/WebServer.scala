@@ -13,6 +13,8 @@ import org.eclipse.jetty.servlets.MultiPartFilter
 
 import scala.concurrent.duration.Duration
 
+import akka.actor.ActorRef
+
 final class WebServer(
     router: Servlet, host: String = "localhost", port: Int = 3000) {
 
@@ -133,6 +135,10 @@ trait AsyncResponder { self: Responder ⇒
   }
 }
 
+trait ActorAware {
+  def reader: ActorRef
+}
+
 trait WebContext // Marker interface
 
 /** Context default factory */
@@ -140,9 +146,10 @@ object WebContext {
   import scala.concurrent.ExecutionContext.Implicits.global
 
   /** Type of default web context */
-  type Default = WebContext with Responder with AsyncResponder
+  sealed trait Default
+      extends WebContext with Responder with AsyncResponder with ActorAware
 
-  private trait Servlet extends WebContext with Responder with AsyncResponder {
+  private trait Servlet extends Default {
     import org.eclipse.jetty.continuation.ContinuationSupport
 
     def resp: HttpServletResponse
@@ -168,7 +175,8 @@ object WebContext {
     }
   }
 
-  def apply(_req: HttpServletRequest, _resp: HttpServletResponse, timeout: Duration = Duration(5, "seconds")): Default = new Servlet {
+  def apply(actor: ActorRef, _req: HttpServletRequest, _resp: HttpServletResponse, timeout: Duration = Duration(5, "seconds")): Default = new Servlet {
+    val reader = actor
     val resp = _resp
     val req = _req
     val defaultTimeout = timeout

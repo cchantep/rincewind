@@ -17,7 +17,7 @@ class SequenceActor(writer: ActorRef, req: ReaderRequest)
       count match {
         case 1 /* last */ => {
           self ! PoisonPill // TODO: Wait everything is successfully sent back
-          sendData(pending.seq)
+          sendData(pending.seq) 
         }
         case _ => context become processing(
           pending.copy(seq = pending.seq :+ data))(offset + 1, count - 1)

@@ -33,4 +33,8 @@ To start a reader using SBT from the CLI in this project base directory: `/path/
 
 **As soon as the reader is provided a sequence** (`Completed sequence ...` in CLI), an embedded Web server is started. In this way, the reader will expose gathered data to HTTP request.
 
-To test the Web interface of the reader, you can open [localhost:3000/random](http://localhost:3000/random) in your browser.
+To test the Web interface of the reader, you can open [localhost:3000/random](http://localhost:3000/random) in your browser. It will answer with a JSON response as following.
+
+```json
+{"uuid":"a12dcf25-1adf-411f-8351-55ceb1d02a3d","sequence":[1,2,3,4,5,6,7,8,9]}
+```
